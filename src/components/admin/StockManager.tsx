@@ -46,8 +46,8 @@ export function StockManager() {
                     <div className="flex gap-2">
                         <Input
                             type="number"
-                            value={stock}
-                            onChange={(e) => setStock(parseInt(e.target.value))}
+                            value={isNaN(stock) ? '' : stock}
+                            onChange={(e) => setStock(parseInt(e.target.value) || 0)}
                         />
                         <Button onClick={updateStock} disabled={loading}>
                             {loading ? "Saving..." : "Update"}

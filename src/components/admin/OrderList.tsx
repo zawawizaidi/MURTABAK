@@ -18,6 +18,7 @@ import { MessageCircle, Printer } from "lucide-react"
 export function OrderList() {
     const [orders, setOrders] = useState<Order[]>([])
     const [mounted, setMounted] = useState(false)
+    const [selectedDate, setSelectedDate] = useState(format(new Date(), "yyyy-MM-dd"))
 
     useEffect(() => {
         setMounted(true)
@@ -58,43 +59,47 @@ export function OrderList() {
     }
 
     const printOrder = (order: Order) => {
+        // Robust date formatting
+        const dateStr = (() => {
+            try { return format(new Date(order.pickup_datetime), "yyyy-MM-dd hh:mm a") }
+            catch { return "Time N/A" }
+        })();
+
         const content = `
-        <html>
-          <head>
-            <title>Order #${order.id}</title>
-            <style>
-               body { font-family: sans-serif; padding: 20px; }
-               .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; }
-               .item { margin: 10px 0; font-size: 1.2em; }
-               .total { font-size: 1.5em; font-weight: bold; margin-top: 20px; }
-            </style>
-          </head>
-          <body>
-             <div class="header">
-                <h1>Murtabak Edy Legend</h1>
-                <p>Order Date: ${new Date().toLocaleString()}</p>
-             </div>
-             <div class="item"><strong>Customer:</strong> ${order.customer_name}</div>
-             <div class="item"><strong>Phone:</strong> ${order.phone}</div>
-             ${order.address ? `<div class="item"><strong>Address:</strong> ${order.address}</div>` : ''}
-             <hr/>
-             <div class="item"><strong>Item:</strong> Murtabak Ayam Mix Daging</div>
-             <div class="item"><strong>Quantity:</strong> ${order.quantity}</div>
-             <div class="item"><strong>Pickup/Delivery:</strong> ${(() => {
-                try {
-                    return format(new Date(order.pickup_datetime), "yyyy-MM-dd hh:mm a")
-                } catch (e) {
-                    return "Time N/A"
-                }
-            })()}</div>
-             <div class="total">Total: RM ${order.total_price.toFixed(2)}</div>
-             <script>window.print();</script>
-          </body>
-        </html>
-      `
-        const w = window.open('', '', 'width=600,height=600')
-        w?.document.write(content)
-        w?.document.close()
+          <html>
+            <head>
+              <title>Order #${order.id}</title>
+              <style>
+                 body { font-family: sans-serif; padding: 20px; }
+                 .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; }
+                 .item { margin: 10px 0; font-size: 1.2em; }
+                 .total { font-size: 1.5em; font-weight: bold; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+               <div class="header">
+                  <h1>Murtabak Edy Legend</h1>
+                  <p>Order Date: ${new Date().toLocaleString()}</p>
+               </div>
+               <div class="item"><strong>Customer:</strong> ${order.customer_name}</div>
+               <div class="item"><strong>Phone:</strong> ${order.phone}</div>
+               ${order.address ? `<div class="item"><strong>Address:</strong> ${order.address}</div>` : ''}
+               <hr/>
+               <div class="item"><strong>Item:</strong> Murtabak Ayam Mix Daging</div>
+               <div class="item"><strong>Quantity:</strong> ${order.quantity}</div>
+               <div class="item"><strong>Pickup/Delivery:</strong> ${dateStr}</div>
+               <div class="total">Total: RM ${order.total_price.toFixed(2)}</div>
+               <script>
+                  window.onload = function() { window.print(); window.close(); }
+               </script>
+            </body>
+          </html>
+        `
+        const w = window.open('', '_blank', 'width=600,height=600')
+        if (w) {
+            w.document.write(content)
+            w.document.close()
+        }
     }
 
     const getStatusBadge = (status: string) => {
@@ -107,92 +112,120 @@ export function OrderList() {
 
     if (!mounted) return <div>Loading...</div>
 
+
+
+    // ... existing useEffect ...
+
+    // Filter orders by date
+    const filteredOrders = orders.filter(order => {
+        try {
+            return order.pickup_datetime.startsWith(selectedDate)
+        } catch { return false }
+    }).sort((a, b) => new Date(a.pickup_datetime).getTime() - new Date(b.pickup_datetime).getTime())
+
     return (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Details</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {orders.length === 0 ? (
+        <div className="space-y-4">
+            <div className="flex items-center gap-4 bg-white p-4 rounded-lg border shadow-sm">
+                <div className="font-semibold">Filter by Date:</div>
+                <input
+                    type="date"
+                    className="border rounded p-2"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                />
+                <div className="ml-auto text-sm text-muted-foreground">
+                    Showing {filteredOrders.length} orders
+                </div>
+            </div>
+
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
                         <TableRow>
-                            <TableCell colSpan={5} className="text-center h-24">
-                                No orders found.
-                            </TableCell>
+                            <TableHead>Time</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Details</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                    ) : (
-                        orders.map((order) => {
-                            // Handle potential concatenated date string from OrderForm or invalid dates
-                            // Our internal format is YYYY-MM-DDTHH:MM
-                            let pickupDate = new Date()
-                            try {
-                                pickupDate = new Date(order.pickup_datetime)
-                                if (isNaN(pickupDate.getTime())) throw new Error("Invalid date")
-                            } catch (e) {
-                                pickupDate = new Date() // Fallback
-                            }
+                    </TableHeader>
+                    <TableBody>
+                        {filteredOrders.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center h-24">
+                                    No orders found for {format(new Date(selectedDate), "dd MMM yyyy")}.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            filteredOrders.map((order) => {
+                                // Handle potential concatenated date string from OrderForm or invalid dates
+                                // Our internal format is YYYY-MM-DDTHH:MM
+                                let pickupDate = new Date()
+                                try {
+                                    pickupDate = new Date(order.pickup_datetime)
+                                    if (isNaN(pickupDate.getTime())) throw new Error("Invalid date")
+                                } catch (e) {
+                                    pickupDate = new Date() // Fallback
+                                }
 
-                            return (
-                                <TableRow key={order.id}>
-                                    <TableCell className="font-medium whitespace-nowrap">
-                                        <div>{format(pickupDate, "dd MMM")}</div>
-                                        <div className="text-xs text-muted-foreground">{format(pickupDate, "hh:mm a")}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="font-bold">{order.customer_name}</div>
-                                        <div className="text-xs text-muted-foreground">{order.phone}</div>
-                                        {order.address && <div className="text-[10px] text-gray-500 max-w-[150px] truncate">{order.address}</div>}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div>{order.quantity}x Murtabak</div>
-                                        <div className="text-xs font-semibold">RM {order.total_price.toFixed(2)}</div>
-                                        <Badge variant="outline" className="mt-1 text-[10px] uppercase">{order.type}</Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        {getStatusBadge(order.status)}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex flex-col gap-2 items-end">
+                                return (
+                                    <TableRow key={order.id}>
+                                        <TableCell className="font-medium whitespace-nowrap">
+                                            <div>{format(pickupDate, "dd MMM")}</div>
+                                            <div className="text-xs text-muted-foreground">{format(pickupDate, "hh:mm a")}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="font-bold">{order.customer_name}</div>
+                                            <div className="text-xs text-muted-foreground">{order.phone}</div>
+                                            {order.address && <div className="text-[10px] text-gray-500 max-w-[150px] truncate">{order.address}</div>}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div>{order.quantity}x Murtabak</div>
+                                            <div className="text-xs font-semibold">RM {order.total_price.toFixed(2)}</div>
+                                            <Badge variant="outline" className="mt-1 text-[10px] uppercase">{order.type}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {getStatusBadge(order.status)}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex flex-col gap-2 items-end">
 
-                                            {/* Status Actions */}
-                                            {order.status === 'pending' && (
+                                                {/* Status Actions */}
                                                 <div className="flex gap-1">
-                                                    <Button size="icon" variant="default" className="bg-green-600 h-8 w-8" onClick={() => updateStatus(order.id, 'approved')} title="Approve">
-                                                        ✓
+                                                    {order.status !== 'approved' && (
+                                                        <Button size="icon" variant="default" className="bg-green-600 h-8 w-8" onClick={() => updateStatus(order.id, 'approved')} title="Approve">
+                                                            ✓
+                                                        </Button>
+                                                    )}
+                                                    {order.status !== 'rejected' && (
+                                                        <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => updateStatus(order.id, 'rejected')} title="Reject">
+                                                            ✕
+                                                        </Button>
+                                                    )}
+                                                </div>
+
+                                                {/* Communication Actions */}
+                                                <div className="flex gap-1">
+                                                    <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-200" onClick={() => window.open(generateWhatsAppLink(order, 'confirm'), '_blank')} title="WhatsApp Confirm">
+                                                        <MessageCircle className="h-4 w-4" />
                                                     </Button>
-                                                    <Button size="icon" variant="destructive" className="h-8 w-8" onClick={() => updateStatus(order.id, 'rejected')} title="Reject">
-                                                        ✕
+                                                    <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-200" onClick={() => window.open(generateWhatsAppLink(order, 'reject'), '_blank')} title="WhatsApp Reject">
+                                                        <span className="text-[10px] font-bold">X</span>
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-500" onClick={() => printOrder(order)} title="Print">
+                                                        <Printer className="h-4 w-4" />
                                                     </Button>
                                                 </div>
-                                            )}
 
-                                            {/* Communication Actions */}
-                                            <div className="flex gap-1">
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-green-600 border-green-200" onClick={() => window.open(generateWhatsAppLink(order, 'confirm'), '_blank')} title="WhatsApp Confirm">
-                                                    <MessageCircle className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="outline" className="h-8 w-8 text-red-600 border-red-200" onClick={() => window.open(generateWhatsAppLink(order, 'reject'), '_blank')} title="WhatsApp Reject">
-                                                    <span className="text-[10px] font-bold">X</span>
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-500" onClick={() => printOrder(order)} title="Print">
-                                                    <Printer className="h-4 w-4" />
-                                                </Button>
                                             </div>
-
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )
-                        })
-                    )}
-                </TableBody>
-            </Table>
+                                        </TableCell>
+                                    </TableRow>
+                                )
+                            })
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     )
 }

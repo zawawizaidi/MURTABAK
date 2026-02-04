@@ -73,6 +73,15 @@ export default function Home() {
                 />
             </main>
 
+            <footer className="mt-12 py-6 text-center text-sm text-gray-500">
+                <p>&copy; 2024 Murtabak Edy Legend Ent. All rights reserved.</p>
+                <div className="mt-2">
+                    <a href="/admin" className="text-xs hover:underline text-gray-400">
+                        Admin Login
+                    </a>
+                </div>
+            </footer>
+
             {/* Mobile Sticky Bar (Visible only on small screens if needed, but styling allows flowing normally) */}
             <div className="md:hidden h-4 w-full"></div>
         </div>

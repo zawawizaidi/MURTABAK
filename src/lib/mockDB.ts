@@ -44,7 +44,13 @@ export const MockDB = {
 
     setStockForDate: (dateStr: string, limit: number) => {
         const stored = localStorage.getItem(STORAGE_KEYS.STOCK)
-        const stockMap = stored ? JSON.parse(stored) : {}
+
+        let stockMap: Record<string, number> = {}
+        try {
+            const parsed = stored ? JSON.parse(stored) : {}
+            stockMap = typeof parsed === 'number' ? {} : parsed
+        } catch { stockMap = {} }
+
         stockMap[dateStr] = limit
         localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify(stockMap))
     },
